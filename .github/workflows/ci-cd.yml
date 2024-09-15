@@ -1,0 +1,57 @@
+name: Django CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        run: |
+          python manage.py migrate
+
+      - name: Run tests
+        run: |
+          python manage.py test
+
+      - name: Format code with black
+        run: |
+          black .
+
+      # Docker build step (commented out)
+      # - name: Build Docker image
+      #   run: |
+      #     docker build -t your-app-name:latest .
+
+      # Docker push step (commented out)
+      # - name: Push Docker image to Docker Hub
+      #   run: |
+      #     echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      #     docker push your-app-name:latest
+
+      # Kubernetes deployment step (commented out)
+      # - name: Deploy to Kubernetes
+      #   run: |
+      #     kubectl apply -f kubernetes/deployment.yaml
