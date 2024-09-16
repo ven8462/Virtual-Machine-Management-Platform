@@ -44,6 +44,17 @@ class CustomUserSerializer(serializers.ModelSerializer):
             'access_token': str(refresh.access_token)
         }
 
+class VirtualMachineCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['name', 'status']  
+
+    def validate_status(self, value):
+        if value not in ['running', 'stopped']:
+            raise serializers.ValidationError("Status must be either 'running' or 'stopped'.")
+        return value
+
+
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
