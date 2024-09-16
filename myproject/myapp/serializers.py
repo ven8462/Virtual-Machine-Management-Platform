@@ -1,5 +1,48 @@
 from rest_framework import serializers
-from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog
+from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
+from django.contrib.auth.models import Group
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.validators import EmailValidator
+from rest_framework.validators import UniqueValidator
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(
+        validators=[
+            EmailValidator(message="Enter a valid email address."),
+            UniqueValidator(queryset=CustomUser.objects.all(), message="Email is already taken.")
+        ]
+    )
+    username = serializers.CharField(
+        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="Username is already taken.")]
+    )
+    password = serializers.CharField(write_only=True)
+    role = serializers.CharField(source='role.name', read_only=True)  # Include role in the response
+
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'role']  # Add role to fields
+
+    def create(self, validated_data):
+        # Set the default role if no role is provided
+        default_role = Role.get_default_role()
+
+        user = CustomUser(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            role=default_role  # Assign the default role
+        )
+        user.set_password(validated_data['password']) 
+        user.save()
+
+        # Generate both refresh and access tokens
+        refresh = RefreshToken.for_user(user)
+        return {
+            'user': user,
+            'refresh_token': str(refresh),
+            'access_token': str(refresh.access_token)
+        }
 
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -35,3 +78,4 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = '__all__'
+
