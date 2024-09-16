@@ -1,22 +1,6 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 
-class CustomUser(AbstractUser):
-    groups = models.ManyToManyField(
-        Group,
-        related_name='customuser_groups',  # Add a unique related_name
-        blank=True,
-        help_text='The groups this user belongs to.',
-        verbose_name='groups',
-    )
-    user_permissions = models.ManyToManyField(
-        Permission,
-        related_name='customuser_user_permissions',  # Add a unique related_name
-        blank=True,
-        help_text='Specific permissions for this user.',
-        verbose_name='user permissions',
-    )
-
 
 class Role(models.Model):
     name = models.CharField(max_length=50)
@@ -24,6 +8,32 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def get_default_role():
+        # You can use get_or_create to avoid duplicates
+        role, created = Role.objects.get_or_create(name='Standard User', defaults={'description': 'Default role for new users'})
+        return role
+    
+class CustomUser(AbstractUser):
+    groups = models.ManyToManyField(
+        Group,
+        related_name='customuser_groups',  
+        blank=True,
+        help_text='The groups this user belongs to.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        related_name='customuser_user_permissions',  
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
+
+
+
     
 class VirtualMachine(models.Model):
     STATUS_CHOICES = [
