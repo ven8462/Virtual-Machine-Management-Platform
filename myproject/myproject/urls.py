@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapp.views import VirtualMachineViewSet, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet
+from myapp.views import VirtualMachineViewSet, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
 
 
 router = DefaultRouter()
@@ -14,4 +14,6 @@ router.register(r'audit-logs', AuditLogViewSet)
 
 urlpatterns = [
     path('api/', include(router.urls)),
+    path('api/signup/', SignUpView.as_view(), name='signup'),
+    path('api/login/', LoginView.as_view(), name='login'), 
 ]
