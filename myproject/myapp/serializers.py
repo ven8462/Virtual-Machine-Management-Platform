@@ -55,6 +55,17 @@ class VirtualMachineCreateSerializer(serializers.ModelSerializer):
         return value
 
 
+class VirtualMachineUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['name', 'status'] 
+
+    def validate_status(self, value):
+        if value not in ['running', 'stopped']:
+            raise serializers.ValidationError("Status must be either 'running' or 'stopped'.")
+        return value
+
+
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
