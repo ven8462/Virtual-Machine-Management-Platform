@@ -1,6 +1,6 @@
 from rest_framework import viewsets, status
-from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog
-from .serializers import VirtualMachineSerializer, BackupSerializer, SnapshotSerializer, PaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer, AuditLogSerializer, CustomUserSerializer
+from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog,CustomUser, Role
+from .serializers import VirtualMachineSerializer, VirtualMachineUpdateSerializer, BackupSerializer, SnapshotSerializer, PaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer, AuditLogSerializer, CustomUserSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .serializers import VirtualMachineCreateSerializer
-
+from django.shortcuts import get_object_or_404
 
 
 class SignUpView(APIView):
@@ -85,14 +85,22 @@ class LoginView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 class CreateVirtualMachineView(APIView):
-    permission_classes = [IsAuthenticated]  
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        print(request.user)
-        print(request.auth)
+        user = request.user
+        
+        # Check if the user has an admin role
+        if user.role.name != 'Admin':
+            return Response({
+                "success": False,
+                "message": "Permission denied. You don't have rights to perform this action.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
         serializer = VirtualMachineCreateSerializer(data=request.data)
         if serializer.is_valid():
-            virtual_machine = serializer.save(owner=request.user)
+            virtual_machine = serializer.save(owner=user)
 
             return Response({
                 "success": True,
@@ -113,7 +121,7 @@ class CreateVirtualMachineView(APIView):
             "errors": serializer.errors,
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
-
+    
 
 class UserVirtualMachinesView(APIView):
     permission_classes = [IsAuthenticated]  
@@ -129,6 +137,87 @@ class UserVirtualMachinesView(APIView):
             "virtual_machines": serializer.data,
             "statusCode": 200
         }, status=status.HTTP_200_OK)
+
+
+class UpdateVirtualMachineView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, vm_id):
+        user = request.user
+        
+        # Check if the user has an admin role
+        if user.role.name != 'Admin':
+            return Response({
+                "success": False,
+                "message": "Permission denied. You don't have rights to perform this action.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+
+        try:
+            virtual_machine = VirtualMachine.objects.get(id=vm_id, owner=request.user)
+        except VirtualMachine.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "Virtual machine not found or not owned by the user.",
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = VirtualMachineUpdateSerializer(virtual_machine, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Virtual machine updated successfully.",
+                "virtual_machine": serializer.data,
+                "statusCode": 200
+            }, status=status.HTTP_200_OK)
+        return Response({
+            "success": False,
+            "message": "Invalid data.",
+            "errors": serializer.errors,
+            "statusCode": 400
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteVirtualMachineView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, vm_id):
+        user = request.user
+        
+        if user.role.name != 'Admin':
+            return Response({
+                "success": False,
+                "message": "Permission denied. You don't have rights to perform this action.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        virtual_machine = get_object_or_404(VirtualMachine, id=vm_id)
+
+        if virtual_machine.owner != user:
+            return Response({
+                "success": False,
+                "message": "You do not have permission to delete this virtual machine.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        virtual_machine.delete()
+
+        AuditLog.objects.create(
+            user=user,
+            action='vm_deleted',
+            description=f"Virtual machine '{virtual_machine.name}' was deleted."
+        )
+
+        return Response({
+            "success": True,
+            "message": "Virtual machine deleted successfully.",
+            "statusCode": 204
+        }, status=status.HTTP_204_NO_CONTENT)
+
+
 
 
 class VirtualMachineViewSet(viewsets.ModelViewSet):
