@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import VirtualMachineCreateSerializer
+from .serializers import VirtualMachineCreateSerializer, BackupCreateSerializer
 from django.shortcuts import get_object_or_404
 
 
@@ -218,6 +218,41 @@ class DeleteVirtualMachineView(APIView):
         }, status=status.HTTP_204_NO_CONTENT)
 
 
+class CreateBackupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        
+        # Check if the user has the 'Standard User' role
+        if user.role.name != 'Standard User':
+            return Response({
+                "success": False,
+                "message": "Permission denied. Only Standard Users can create backups.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = BackupCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            backup = serializer.save()
+            return Response({
+                "success": True,
+                "message": "Backup created successfully.",
+                "backup": {
+                    "id": backup.id,
+                    "vm": backup.vm.id,
+                    "size": backup.size,
+                    "created_at": backup.created_at
+                },
+                "statusCode": 201
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            "success": False,
+            "message": "Invalid data.",
+            "errors": serializer.errors,
+            "statusCode": 400
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VirtualMachineViewSet(viewsets.ModelViewSet):
