@@ -255,6 +255,71 @@ class CreateBackupView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+from .models import VirtualMachine, CustomUser
+from .serializers import MoveVirtualMachineSerializer
+
+class MoveVirtualMachineView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, vm_id):
+        user = request.user
+        
+        # Only allow Admin users to move VMs
+        if user.role.name != 'Admin':
+            return Response({
+                "success": False,
+                "message": "Permission denied. Only Admins can move virtual machines.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Get the VM to move
+        try:
+            virtual_machine = VirtualMachine.objects.get(id=vm_id)
+        except VirtualMachine.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "Virtual machine not found.",
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Deserialize and validate the new owner
+        serializer = MoveVirtualMachineSerializer(data=request.data)
+        if serializer.is_valid():
+            new_owner = serializer.validated_data['new_owner']
+
+            # Move the VM to the new owner
+            virtual_machine.owner = new_owner
+            virtual_machine.save()
+
+            # Log the movement of the VM
+            AuditLog.objects.create(
+                user=user,
+                action='vm_moved',
+                description=f"Virtual machine '{virtual_machine.name}' was moved to user '{new_owner.username}'."
+            )
+
+            return Response({
+                "success": True,
+                "message": "Virtual machine moved successfully.",
+                "virtual_machine": {
+                    "id": virtual_machine.id,
+                    "name": virtual_machine.name,
+                    "new_owner": new_owner.username,
+                    "moved_by": user.username,
+                    "statusCode": 200
+                }
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "success": False,
+            "message": "Invalid data.",
+            "errors": serializer.errors,
+            "statusCode": 400
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 class VirtualMachineViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated] 
     queryset = VirtualMachine.objects.all()
