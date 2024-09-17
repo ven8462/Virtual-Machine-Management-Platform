@@ -66,6 +66,21 @@ class VirtualMachineUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
+class BackupCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Backup
+        fields = ['vm', 'size']
+
+    def validate_vm(self, value):
+        if not VirtualMachine.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("The specified virtual machine does not exist.")
+        return value
+
+    def validate_size(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Backup size must be greater than zero.")
+        return value
+
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
