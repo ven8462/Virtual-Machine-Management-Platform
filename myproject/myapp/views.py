@@ -1,17 +1,17 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, generics
 from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog,CustomUser, Role
-from .serializers import VirtualMachineSerializer, VirtualMachineUpdateSerializer, BackupSerializer, SnapshotSerializer, PaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer, AuditLogSerializer, CustomUserSerializer
+from .serializers import VirtualMachineSerializer, MoveVirtualMachineSerializer, VirtualMachineUpdateSerializer, BackupSerializer, SnapshotSerializer, PaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer, AuditLogSerializer, CustomUserSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser
 from .models import CustomUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import VirtualMachineCreateSerializer, BackupCreateSerializer
+from .serializers import VirtualMachineCreateSerializer, BackupCreateSerializer, BillingSerializer
 from django.shortcuts import get_object_or_404
-
+from django.utils import timezone
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -253,6 +253,260 @@ class CreateBackupView(APIView):
             "errors": serializer.errors,
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MoveVirtualMachineView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, vm_id):
+        user = request.user
+        
+        # Only allow Admin users to move VMs
+        if user.role.name != 'Admin':
+            return Response({
+                "success": False,
+                "message": "Permission denied. You don't have rights to perform this action.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Get the VM to move
+        try:
+            virtual_machine = VirtualMachine.objects.get(id=vm_id)
+        except VirtualMachine.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "Virtual machine not found.",
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Deserialize and validate the new owner
+        serializer = MoveVirtualMachineSerializer(data=request.data)
+        if serializer.is_valid():
+            new_owner = serializer.validated_data['new_owner']
+
+            # Move the VM to the new owner
+            virtual_machine.owner = new_owner
+            virtual_machine.save()
+
+            # Log the movement of the VM
+            AuditLog.objects.create(
+                user=user,
+                action='vm_moved',
+                description=f"Virtual machine '{virtual_machine.name}' was moved to user '{new_owner.username}'."
+            )
+
+            return Response({
+                "success": True,
+                "message": "Virtual machine moved successfully.",
+                "virtual_machine": {
+                    "id": virtual_machine.id,
+                    "name": virtual_machine.name,
+                    "new_owner": new_owner.username,
+                    "moved_by": user.username,
+                    "statusCode": 200
+                }
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "success": False,
+            "message": "Invalid data.",
+            "errors": serializer.errors,
+            "statusCode": 400
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ViewBillingInfoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Check if the user has the 'Standard User' role
+        if user.role.name != 'Standard User':
+            return Response({
+                "success": False,
+                "message": "Permission denied. Only Standard Users can view billing information.",
+                "statusCode": 403
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Get the user's payments (assuming Payment model has a relation to the user or subscription)
+        payments = Payment.objects.filter(user=user)  # Modify if linked through subscription
+
+        if not payments.exists():
+            return Response({
+                "success": False,
+                "message": "No billing information found.",
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Serialize and return the billing information
+        serializer = BillingSerializer(payments, many=True)
+        return Response({
+            "success": True,
+            "message": "Billing information retrieved successfully.",
+            "billing_info": serializer.data,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
+
+
+class SubscribePlanView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        plan_name = request.data.get('plan')
+        plan = get_object_or_404(SubscriptionPlan, name=plan_name)
+
+        # Check if user already has an active subscription
+        existing_subscription = UserSubscription.objects.filter(
+            user=request.user,
+            expires_at__gt=timezone.now()
+        ).first()
+
+        if existing_subscription:
+            return Response({
+                "success": False,
+                "message": "User already has an active subscription.",
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create new subscription
+        subscription = UserSubscription.objects.create(
+            user=request.user,
+            subscription_plan=plan,
+            started_at=timezone.now(),
+            expires_at=timezone.now() + timezone.timedelta(days=30)
+        )
+
+        # Create payment record
+        Payment.objects.create(
+            user=request.user,
+            subscription_plan=plan,
+            amount=plan.cost,
+            status='paid',
+            transaction_id='mock_transaction_id'  # Mock ID for testing
+        )
+
+        return Response({
+            "success": True,
+            "message": f"Successfully subscribed to {plan_name} plan.",
+            "subscription": UserSubscriptionSerializer(subscription).data,
+            "statusCode": 201
+        }, status=status.HTTP_201_CREATED)
+
+
+class CreateSubscriptionPlanView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubscriptionPlanSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            subscription_plan = serializer.save()
+            return Response({
+                "success": True,
+                "message": "Subscription plan created successfully.",
+                "subscription_plan": serializer.data,
+                "statusCode": 201
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            "success": False,
+            "message": "Invalid data.",
+            "errors": serializer.errors,
+            "statusCode": 400
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteSubscriptionPlanView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = SubscriptionPlan.objects.all()
+    serializer_class = SubscriptionPlanSerializer
+
+    def delete(self, request, *args, **kwargs):
+        plan = get_object_or_404(SubscriptionPlan, pk=kwargs.get('pk'))
+        
+        # Optional: Check if there are any active subscriptions associated with this plan
+        if UserSubscription.objects.filter(subscription_plan=plan, expires_at__gt=timezone.now()).exists():
+            return Response({
+                "success": False,
+                "message": "Cannot delete subscription plan with active subscriptions.",
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        plan.delete()
+        return Response({
+            "success": True,
+            "message": "Subscription plan deleted successfully.",
+            "statusCode": 204
+        }, status=status.HTTP_204_NO_CONTENT)
+
+
+class CurrentSubscriptionView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSubscriptionSerializer
+
+    def get(self, request):
+        subscription = get_object_or_404(UserSubscription, user=request.user)
+
+        return Response({
+            "success": True,
+            "message": "Subscription details retrieved successfully.",
+            "subscription": UserSubscriptionSerializer(subscription).data,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
+
+
+# Make Payment (Mock)
+class MockPaymentView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        card_number = request.data.get('card_number')
+        amount = request.data.get('amount')
+
+        if not card_number or len(card_number) != 16:
+            return Response({
+                "success": False,
+                "message": "Invalid card number.",
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mock payment processing
+        payment = Payment.objects.create(
+            user=request.user,
+            amount=amount,
+            status='paid',
+            transaction_id=f"TXN-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+        )
+
+        return Response({
+            "success": True,
+            "message": "Payment successful.",
+            "transaction_id": payment.transaction_id,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
+
+
+# View Payment History
+class PaymentHistoryView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentSerializer
+
+    def get(self, request):
+        payments = Payment.objects.filter(user=request.user)
+
+        if not payments.exists():
+            return Response({
+                "success": False,
+                "message": "No payment history found.",
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "success": True,
+            "message": "Payment history retrieved successfully.",
+            "payments": PaymentSerializer(payments, many=True).data,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
 
 
 class VirtualMachineViewSet(viewsets.ModelViewSet):
