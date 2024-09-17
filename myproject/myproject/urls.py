@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapp.views import VirtualMachineViewSet, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
-
+from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
+from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscriptionPlanView, MockPaymentView, PaymentHistoryView, CreateSubscriptionPlanView
 
 router = DefaultRouter()
 router.register(r'vms', VirtualMachineViewSet)
@@ -22,4 +22,11 @@ urlpatterns = [
     path('api/vms/delete/<int:vm_id>/', DeleteVirtualMachineView.as_view(), name='delete-vm'),
     path('api/create-backup/', CreateBackupView.as_view(), name='create-backup'),
     path('api/virtual-machines/<int:vm_id>/move/', MoveVirtualMachineView.as_view(), name='move-virtual-machine'),
+    path('api/billing-info/', ViewBillingInfoView.as_view(), name='view-billing-info'),
+    path('api/subscribe/', SubscribePlanView.as_view(), name='subscribe_plan'),
+    path('api/subscription/', CurrentSubscriptionView.as_view(), name='current_subscription'),
+    path('api/payment/', MockPaymentView.as_view(), name='make_payment'),
+    path('api/payment-history/', PaymentHistoryView.as_view(), name='payment_history'),
+    path('api/create-subscription-plan/', CreateSubscriptionPlanView.as_view(), name='create_subscription_plan'),
+    path('api/delete-subscription-plan/<int:pk>/', DeleteSubscriptionPlanView.as_view(), name='delete_subscription_plan'),
 ]
