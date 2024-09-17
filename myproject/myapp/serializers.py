@@ -81,6 +81,28 @@ class BackupCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Backup size must be greater than zero.")
         return value
 
+
+class MoveVirtualMachineSerializer(serializers.ModelSerializer):
+    new_owner = serializers.CharField()
+
+    class Meta:
+        model = VirtualMachine
+        fields = ['new_owner']
+
+    def validate_new_owner(self, value):
+        try:
+            new_owner = CustomUser.objects.get(username=value)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("The specified user does not exist.")
+
+        # Ensure that the new owner has the 'Standard User' role
+        if new_owner.role.name != 'Standard User':
+            raise serializers.ValidationError("The new owner must be a Standard User.")
+        
+        return new_owner
+
+
+
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
