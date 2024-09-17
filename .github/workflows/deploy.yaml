@@ -1,0 +1,35 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Build Docker images
+      run: |
+        docker build -t your_django_image_name -f Dockerfile.django .
+        docker build -t your_react_image_name -f Dockerfile.react .
+
+    - name: Push Docker images
+      run: |
+        docker tag your_django_image_name your_dockerhub_username/your_django_image_name:latest
+        docker tag your_react_image_name your_dockerhub_username/your_react_image_name:latest
+        docker push your_dockerhub_username/your_django_image_name:latest
+        docker push your_dockerhub_username/your_react_image_name:latest
+
+    - name: Deploy to Kubernetes
+      uses: azure/setup-kubectl@v1
+      with:
+        version: '1.22.0'
+      run: |
+        kubectl apply -f django-deployment.yaml
+        kubectl apply -f react-deployment.yaml
+        kubectl apply -f services.yaml
+        kubectl apply -f ingress.yaml
