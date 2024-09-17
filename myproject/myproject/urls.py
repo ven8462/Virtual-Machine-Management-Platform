@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapp.views import VirtualMachineViewSet, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
+from myapp.views import VirtualMachineViewSet, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
 
 
 router = DefaultRouter()
@@ -20,4 +20,6 @@ urlpatterns = [
     path('api/my-vms/', UserVirtualMachinesView.as_view(), name='user-vms'),
     path('api/vms/update/<int:vm_id>/', UpdateVirtualMachineView.as_view(), name='update-vm'),
     path('api/vms/delete/<int:vm_id>/', DeleteVirtualMachineView.as_view(), name='delete-vm'),
+    path('api/create-backup/', CreateBackupView.as_view(), name='create-backup'),
+    path('api/virtual-machines/<int:vm_id>/move/', MoveVirtualMachineView.as_view(), name='move-virtual-machine'),
 ]
