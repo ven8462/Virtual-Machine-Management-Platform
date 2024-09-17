@@ -67,17 +67,6 @@ class Snapshot(models.Model):
 
 
 
-class Payment(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=[('paid', 'Paid'), ('unpaid', 'Unpaid')])
-    transaction_id = models.CharField(max_length=100, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Payment - {self.transaction_id} - {self.status}"
-
-
 class SubscriptionPlan(models.Model):
     PLAN_CHOICES = [
         ('platinum', 'Platinum'),
@@ -86,12 +75,24 @@ class SubscriptionPlan(models.Model):
         ('bronze', 'Bronze'),
     ]
     
-    name = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    name = models.CharField(max_length=20, unique=True, choices=PLAN_CHOICES)
     max_vms = models.IntegerField()
     max_backups = models.IntegerField()
+    cost = models.DecimalField(max_digits=10, decimal_places=2)  
 
     def __str__(self):
         return self.name
+
+class Payment(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE, null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=[('paid', 'Paid'), ('unpaid', 'Unpaid')])
+    transaction_id = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Payment - {self.transaction_id} - {self.status}"
 
 class UserSubscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
