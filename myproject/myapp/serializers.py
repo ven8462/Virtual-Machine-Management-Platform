@@ -102,6 +102,36 @@ class MoveVirtualMachineSerializer(serializers.ModelSerializer):
         return new_owner
 
 
+class SubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = ['name', 'max_vms', 'max_backups', 'cost']
+
+class BillingSerializer(serializers.ModelSerializer):
+    subscription_plan = SubscriptionPlanSerializer()
+    
+    class Meta:
+        model = Payment
+        fields = ['amount', 'created_at', 'status', 'subscription_plan']  
+
+class SubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = ['id', 'name', 'cost', 'duration']
+
+
+class UserSubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSubscription
+        fields = ['user', 'subscription_plan', 'started_at', 'expires_at']
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['user', 'amount', 'status', 'transaction_id', 'created_at']
+
+
 
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
