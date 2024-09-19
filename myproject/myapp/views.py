@@ -69,11 +69,14 @@ class LoginView(APIView):
 
             # If the user is successfully authenticated, generate tokens
             refresh = RefreshToken.for_user(user)
+            
+            # Add user's role to the response
             return Response({
                 "success": True,
                 "message": "Login successful.",
                 "refresh_token": str(refresh),
                 "access_token": str(refresh.access_token),
+                "role": user.role.name,  # Return user's role
                 "statusCode": 200
             }, status=status.HTTP_200_OK)
 
@@ -83,6 +86,7 @@ class LoginView(APIView):
                 "message": "Invalid username or password.",
                 "statusCode": 404
             }, status=status.HTTP_404_NOT_FOUND)
+
 
 class CreateVirtualMachineView(APIView):
     permission_classes = [IsAuthenticated]
