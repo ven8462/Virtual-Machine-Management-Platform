@@ -95,7 +95,7 @@ class CreateVirtualMachineView(APIView):
         user = request.user
         
         # Check if the user has an admin role
-        if user.role.name != 'Admin':
+        if user.role.name != 'Standard User':
             return Response({
                 "success": False,
                 "message": "Permission denied. You don't have rights to perform this action.",
@@ -266,7 +266,7 @@ class MoveVirtualMachineView(APIView):
         user = request.user
         
         # Only allow Admin users to move VMs
-        if user.role.name != 'Admin':
+        if user.role.name != 'Standard User':
             return Response({
                 "success": False,
                 "message": "Permission denied. You don't have rights to perform this action.",
