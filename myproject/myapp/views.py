@@ -69,11 +69,14 @@ class LoginView(APIView):
 
             # If the user is successfully authenticated, generate tokens
             refresh = RefreshToken.for_user(user)
+            
+            # Add user's role to the response
             return Response({
                 "success": True,
                 "message": "Login successful.",
                 "refresh_token": str(refresh),
                 "access_token": str(refresh.access_token),
+                "role": user.role.name,  # Return user's role
                 "statusCode": 200
             }, status=status.HTTP_200_OK)
 
@@ -84,6 +87,7 @@ class LoginView(APIView):
                 "statusCode": 404
             }, status=status.HTTP_404_NOT_FOUND)
 
+
 class CreateVirtualMachineView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -91,7 +95,7 @@ class CreateVirtualMachineView(APIView):
         user = request.user
         
         # Check if the user has an admin role
-        if user.role.name != 'Admin':
+        if user.role.name != 'Standard User':
             return Response({
                 "success": False,
                 "message": "Permission denied. You don't have rights to perform this action.",
@@ -262,7 +266,7 @@ class MoveVirtualMachineView(APIView):
         user = request.user
         
         # Only allow Admin users to move VMs
-        if user.role.name != 'Admin':
+        if user.role.name != 'Standard User':
             return Response({
                 "success": False,
                 "message": "Permission denied. You don't have rights to perform this action.",
