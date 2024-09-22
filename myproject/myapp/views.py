@@ -15,8 +15,12 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .serializers import AssignVMMachineSerializer
 from .models import SubUser
-from .serializers import SubUserSerializer
+from .serializers import SubUserSerializer, BackupSerializer
+from .serializers import VirtualMachineSerializers
+from django.contrib.auth import get_user_model
+import jwt
 
+User = get_user_model()
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -220,6 +224,101 @@ class AssignVMMachineView(APIView):
 
 
 
+
+
+
+class UnpaidBackupDetailsView(APIView):
+
+    def get(self, request):
+        # Extract user ID from the token
+        token = request.META.get('HTTP_AUTHORIZATION', '').split(' ')[1]
+        
+        try:
+            decoded_token = jwt.decode(token, 'your_secret_key', algorithms=['HS256'])
+            user_id = decoded_token['user_id']  # Adjust based on your token payload structure
+            user = User.objects.get(pk=user_id)
+        except (jwt.ExpiredSignatureError, jwt.DecodeError, User.DoesNotExist):
+            return Response({"message": "Invalid token or user does not exist."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Query unpaid backups for this user
+        unpaid_backups = Backup.objects.filter(vm__owner=user, status='unpaid')
+        
+        if not unpaid_backups.exists():
+            return Response({"message": "No unpaid backups found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        total_bill = sum(backup.bill for backup in unpaid_backups)
+        
+        # Prepare the response data
+        backup_details = [
+            {
+                "vm_name": backup.vm.name,
+                "size": backup.size,
+                "bill": backup.bill,
+                "created_at": backup.created_at,
+                "status": backup.status,
+            }
+            for backup in unpaid_backups
+        ]
+
+        response_data = {
+            "total_bill": total_bill,
+            "backups": backup_details,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+
+class CreateBackupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Extract data from the request
+        vm_id = request.data.get('vm')
+        size = request.data.get('size')
+        bill = request.data.get('bill')
+
+        # Check if the virtual machine exists
+        try:
+            vm = VirtualMachine.objects.get(id=vm_id)
+        except VirtualMachine.DoesNotExist:
+            return Response({
+                'message': 'Virtual Machine does not exist',
+                "success": False,
+                "statusCode": 404
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Create the Backup instance using the validated data
+        backup_data = {
+            'vm': vm,
+            'size': size,
+            'bill': bill,
+            'status': 'unpaid'
+        }
+
+        backup_serializer = BackupSerializer(data=backup_data)
+        if backup_serializer.is_valid():
+            backup_serializer.save()
+            # Set unbacked_data to zero in the Virtual Machine
+            vm.unbacked_data = 0.0
+            vm.save()
+
+            return Response({
+                "success": True,
+                "message": "Backup created successfully",
+                "data": backup_serializer.data,
+                "statusCode": 201
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'message': 'Invalid data',
+                'errors': backup_serializer.errors,
+                "success": False,
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 class CreateSubUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -411,41 +510,30 @@ class DeleteVirtualMachineView(APIView):
         }, status=status.HTTP_204_NO_CONTENT)
 
 
-class CreateBackupView(APIView):
+
+
+class AssignedVirtualMachinesView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def get(self, request):
         user = request.user
-        
-        # Check if the user has the 'Standard User' role
-        if user.role.name != 'Standard User':
-            return Response({
-                "success": False,
-                "message": "Permission denied. Only Standard Users can create backups.",
-                "statusCode": 403
-            }, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = BackupCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            backup = serializer.save()
-            return Response({
-                "success": True,
-                "message": "Backup created successfully.",
-                "backup": {
-                    "id": backup.id,
-                    "vm": backup.vm.id,
-                    "size": backup.size,
-                    "created_at": backup.created_at
-                },
-                "statusCode": 201
-            }, status=status.HTTP_201_CREATED)
+        assigned_vms = UserAssignedVM.objects.filter(new_owner=user)
+
+        vms = [user_assigned.vm for user_assigned in assigned_vms]
+
+        # Serialize the virtual machines
+        serializer = VirtualMachineSerializers(vms, many=True)
 
         return Response({
-            "success": False,
-            "message": "Invalid data.",
-            "errors": serializer.errors,
-            "statusCode": 400
-        }, status=status.HTTP_400_BAD_REQUEST)
+            "success": True,
+            "message": "Assigned virtual machines retrieved successfully",
+            "data": serializer.data,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
+
+
+
 
 
 class MoveVirtualMachineView(APIView):

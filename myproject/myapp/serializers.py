@@ -87,8 +87,29 @@ class AssignVMMachineSerializer(serializers.Serializer):
         return data
 
 
-from rest_framework import serializers
-from .models import VirtualMachine
+class BackupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Backup
+        fields = ['vm', 'size', 'bill']
+    
+    def validate_vm(self, value):
+        """Check if the Virtual Machine exists."""
+        if not VirtualMachine.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Virtual Machine does not exist.")
+        return value
+
+    def validate_size(self, value):
+        """Ensure the size is a positive number."""
+        if value <= 0:
+            raise serializers.ValidationError("Size must be greater than zero.")
+        return value
+
+    def validate_bill(self, value):
+        """Ensure the bill is a non-negative number."""
+        if value < 0:
+            raise serializers.ValidationError("Bill cannot be negative.")
+        return value
+
 
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,6 +136,11 @@ class CustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['id', 'username', 'email', 'role']
 
+
+class VirtualMachineSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['id', 'name', 'cpu', 'ram', 'cost', 'status', 'unbacked_data', 'created_at', 'updated_at']
 
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:

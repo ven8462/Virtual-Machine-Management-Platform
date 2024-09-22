@@ -4,7 +4,9 @@ from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualM
 from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscriptionPlanView, MockPaymentView, PaymentHistoryView, CreateSubscriptionPlanView
 from django.http import HttpResponse
 from myapp.views import StandardUserListView, DeleteVMAPIView,  AssignVMMachineView, AllVirtualMachinesView, VirtualMachineEditView
-from myapp.views import CreateSubUserView, ListSubUsersView
+from myapp.views import CreateSubUserView, ListSubUsersView, UnpaidBackupDetailsView, AssignedVirtualMachinesView
+
+
 
 def index(request):
     return HttpResponse("Welcome to the VM Management Platform")
@@ -42,4 +44,6 @@ urlpatterns = [
     path('api/vms/delete/<int:vm_id>/', DeleteVMAPIView.as_view(), name='delete_vm'),
     path('api/sub-users/create/', CreateSubUserView.as_view(), name='create_sub_user'),
     path('api/sub-users/', ListSubUsersView.as_view(), name='list_sub_users'),
+    path('api/vms/assigned/', AssignedVirtualMachinesView.as_view(), name='assigned_virtual_machines'),
+    path('api/unpaid-backups/', UnpaidBackupDetailsView.as_view(), name='unpaid-backups'),
 ]
