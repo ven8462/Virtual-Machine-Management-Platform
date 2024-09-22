@@ -64,6 +64,16 @@ class VirtualMachineCreateSerializer(serializers.ModelSerializer):
         return data
 
 
+from rest_framework import serializers
+from .models import VirtualMachine
+
+class VirtualMachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['id', 'name', 'status', 'created_at', 'owner'] 
+
+
+
 class VirtualMachineUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
