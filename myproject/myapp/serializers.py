@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
+from .models import VirtualMachine, UserAssignedVM, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
 from django.contrib.auth.models import Group
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.validators import EmailValidator
@@ -62,9 +62,37 @@ class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         return data
 
+class AssignVMMachineSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    vm_id = serializers.IntegerField()
 
-from rest_framework import serializers
-from .models import VirtualMachine
+    def validate(self, data):
+        # Check if the user exists
+        try:
+            user = CustomUser.objects.get(pk=data['user_id'])
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("User does not exist.")
+
+        # Check if the VM exists
+        try:
+            vm = VirtualMachine.objects.get(pk=data['vm_id'])
+        except VirtualMachine.DoesNotExist:
+            raise serializers.ValidationError("Virtual Machine does not exist.")
+        
+        # Ensure that the user has fewer than 20 VMs assigned
+        assigned_vm_count = UserAssignedVM.objects.filter(new_owner=user).count()
+        if assigned_vm_count >= 20:
+            raise serializers.ValidationError("This user already has the maximum allowed number of virtual machines assigned.")
+
+        return data
+
+
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'role']
+
 
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:

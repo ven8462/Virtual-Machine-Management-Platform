@@ -34,6 +34,8 @@ class CustomUser(AbstractUser):
 
 
 
+
+
     
 class VirtualMachine(models.Model):
     STATUS_CHOICES = [
@@ -52,6 +54,17 @@ class VirtualMachine(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class UserAssignedVM(models.Model):
+    new_owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    vm = models.ForeignKey(VirtualMachine, on_delete=models.CASCADE)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('new_owner', 'vm')
+    def __str__(self):
+        return f"{self.new_owner.username} assigned to {self.vm.name}"
 
 
 class Backup(models.Model):

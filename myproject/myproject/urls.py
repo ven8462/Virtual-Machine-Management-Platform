@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
 from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscriptionPlanView, MockPaymentView, PaymentHistoryView, CreateSubscriptionPlanView
 from django.http import HttpResponse
+from myapp.views import StandardUserListView, AssignVMMachineView, AllVirtualMachinesView
 
 
 def index(request):
@@ -20,10 +21,11 @@ router.register(r'audit-logs', AuditLogViewSet)
 urlpatterns = [
     path('', index, name='home'),
     path('api/', include(router.urls)),
+    path('api/standard-users/', StandardUserListView.as_view(), name='standard-user-list'),
     path('api/signup/', SignUpView.as_view(), name='signup'),
     path('api/login/', LoginView.as_view(), name='login'), 
     path('api/create-vms/', CreateVirtualMachineView.as_view(), name='create-vm'),
-    path('api/my-vms/', UserVirtualMachinesView.as_view(), name='user-vms'),
+    path('api/my-vms/', AllVirtualMachinesView.as_view(), name='user-vms'),
     path('api/vms/update/<int:vm_id>/', UpdateVirtualMachineView.as_view(), name='update-vm'),
     path('api/vms/delete/<int:vm_id>/', DeleteVirtualMachineView.as_view(), name='delete-vm'),
     path('api/create-backup/', CreateBackupView.as_view(), name='create-backup'),
@@ -35,4 +37,5 @@ urlpatterns = [
     path('api/payment-history/', PaymentHistoryView.as_view(), name='payment_history'),
     path('api/create-subscription-plan/', CreateSubscriptionPlanView.as_view(), name='create_subscription_plan'),
     path('api/delete-subscription-plan/<int:pk>/', DeleteSubscriptionPlanView.as_view(), name='delete_subscription_plan'),
+    path('api/assign-vm/', AssignVMMachineView.as_view(), name='assign-vm'),
 ]

@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status, generics
-from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog,CustomUser, Role
+from .models import VirtualMachine, Backup, UserAssignedVM, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog,CustomUser, Role
 from .serializers import VirtualMachineSerializer, MoveVirtualMachineSerializer, VirtualMachineUpdateSerializer, BackupSerializer, SnapshotSerializer, PaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer, AuditLogSerializer, CustomUserSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +12,8 @@ from rest_framework.response import Response
 from .serializers import VirtualMachineCreateSerializer, BackupCreateSerializer, BillingSerializer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
+from .serializers import AssignVMMachineSerializer
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -88,8 +90,6 @@ class LoginView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 
-from rest_framework.exceptions import ValidationError
-
 class CreateVirtualMachineView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -143,6 +143,22 @@ class CreateVirtualMachineView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class AllVirtualMachinesView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def get(self, request):
+        # Fetch all virtual machines, not limited to the current user
+        virtual_machines = VirtualMachine.objects.all()
+        serializer = VirtualMachineSerializer(virtual_machines, many=True)
+        return Response({
+            "success": True,
+            "message": "All virtual machines retrieved successfully.",
+            "virtual_machines": serializer.data,
+            "statusCode": 200
+        }, status=status.HTTP_200_OK)
+
+
+
 class UserVirtualMachinesView(APIView):
     permission_classes = [IsAuthenticated]  
 
@@ -157,6 +173,65 @@ class UserVirtualMachinesView(APIView):
             "virtual_machines": serializer.data,
             "statusCode": 200
         }, status=status.HTTP_200_OK)
+
+
+class AssignVMMachineView(APIView):
+    def put(self, request, *args, **kwargs):
+        serializer = AssignVMMachineSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            user_id = serializer.validated_data['user_id']
+            vm_id = serializer.validated_data['vm_id']
+
+            try:
+                # Fetch the user and the VM
+                user = CustomUser.objects.get(pk=user_id)
+                vm = VirtualMachine.objects.get(pk=vm_id)
+                
+                # Assign the VM to the user and save the assignment in UserAssignedVM
+                vm.owner = user
+                vm.save()
+
+                # Save the assignment in UserAssignedVM
+                UserAssignedVM.objects.create(new_owner=user, vm=vm)
+
+                return Response(
+                    {
+                        "message": f"Virtual machine '{vm.name}' assigned to user '{user.username}' successfully.",
+                        "success": True,
+                        "statusCode": 200
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except (CustomUser.DoesNotExist, VirtualMachine.DoesNotExist):
+                return Response(
+                    {
+                        "message": "Invalid user or virtual machine ID.",
+                        "success": False,
+                        "statusCode": 500
+                     },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class StandardUserListView(generics.ListAPIView):
+    serializer_class = CustomUserSerializer
+
+    def get_queryset(self):
+        # Get the 'Standard User' role
+        standard_user_role = Role.objects.get(name='Standard User')
+        
+        # Filter users who have this role
+        return CustomUser.objects.filter(role=standard_user_role)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 
 class UpdateVirtualMachineView(APIView):
