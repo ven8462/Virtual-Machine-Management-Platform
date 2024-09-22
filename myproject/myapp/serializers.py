@@ -47,20 +47,19 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
-        fields = ['name', 'status', 'cpu', 'ram', 'cost']  # Include additional fields
+        fields = ['name', 'status', 'cpu', 'ram', 'cost']  
 
     def validate_status(self, value):
         if value not in ['running', 'stopped']:
             raise serializers.ValidationError("Status must be either 'running' or 'stopped'.")
         return value
 
-    def validate_cost(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Cost must be a positive value.")
-        return value
+    # def validate_cost(self, value):
+    #     if value <= 0:
+    #         raise serializers.ValidationError("Cost must be a positive value.")
+    #     return value
 
     def validate(self, data):
-        # You can add more complex validation logic here if needed
         return data
 
 
@@ -150,12 +149,6 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = ['user', 'amount', 'status', 'transaction_id', 'created_at']
 
-
-
-class VirtualMachineSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = VirtualMachine
-        fields = '__all__'
 
 class BackupSerializer(serializers.ModelSerializer):
     class Meta:

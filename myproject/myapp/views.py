@@ -88,13 +88,15 @@ class LoginView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 
+from rest_framework.exceptions import ValidationError
+
 class CreateVirtualMachineView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user = request.user
         
-        # Check if the user has an admin role
+        # Check if the user has a Standard User role
         if user.role.name != 'Standard User':
             return Response({
                 "success": False,
@@ -103,32 +105,43 @@ class CreateVirtualMachineView(APIView):
             }, status=status.HTTP_403_FORBIDDEN)
 
         serializer = VirtualMachineCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            virtual_machine = serializer.save(owner=user)
 
+        try:
+            if serializer.is_valid(raise_exception=True):
+                virtual_machine = serializer.save(owner=user)
+
+                return Response({
+                    "success": True,
+                    "message": "Virtual machine created successfully.",
+                    "virtual_machine": {
+                        "id": virtual_machine.id,
+                        "name": virtual_machine.name,
+                        "status": virtual_machine.status,
+                        "cpu": virtual_machine.cpu,
+                        "ram": virtual_machine.ram,
+                        "cost": virtual_machine.cost,
+                        "owner": virtual_machine.owner.username,
+                        "created_at": virtual_machine.created_at
+                    },
+                    "statusCode": 201
+                }, status=status.HTTP_201_CREATED)
+
+        except ValidationError as ve:
             return Response({
-                "success": True,
-                "message": "Virtual machine created successfully.",
-                "virtual_machine": {
-                    "id": virtual_machine.id,
-                    "name": virtual_machine.name,
-                    "status": virtual_machine.status,
-                    "cpu": virtual_machine.cpu,
-                    "ram": virtual_machine.ram,
-                    "cost": virtual_machine.cost,
-                    "owner": virtual_machine.owner.username,
-                    "created_at": virtual_machine.created_at
-                },
-                "statusCode": 201
-            }, status=status.HTTP_201_CREATED)
+                "success": False,
+                "message": "Validation error.",
+                "errors": ve.detail,  # Return detailed validation error
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "An error occurred while creating the virtual machine.",
+                "error": str(e),  # Log the exception
+                "statusCode": 500
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({
-            "success": False,
-            "message": "Invalid data.",
-            "errors": serializer.errors,
-            "statusCode": 400
-        }, status=status.HTTP_400_BAD_REQUEST)
- 
 
 class UserVirtualMachinesView(APIView):
     permission_classes = [IsAuthenticated]  
