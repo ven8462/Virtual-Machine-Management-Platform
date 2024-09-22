@@ -47,12 +47,21 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
-        fields = ['name', 'status']  
+        fields = ['name', 'status', 'cpu', 'ram', 'cost']  # Include additional fields
 
     def validate_status(self, value):
         if value not in ['running', 'stopped']:
             raise serializers.ValidationError("Status must be either 'running' or 'stopped'.")
         return value
+
+    def validate_cost(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Cost must be a positive value.")
+        return value
+
+    def validate(self, data):
+        # You can add more complex validation logic here if needed
+        return data
 
 
 class VirtualMachineUpdateSerializer(serializers.ModelSerializer):

@@ -43,12 +43,16 @@ class VirtualMachine(models.Model):
     
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    cpu = models.CharField(max_length=50, default='2 vCPUs')  
+    ram = models.CharField(max_length=50, default='4 GB') 
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=20.00) 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
 
 class Backup(models.Model):
     vm = models.ForeignKey(VirtualMachine, on_delete=models.CASCADE, related_name='backups')

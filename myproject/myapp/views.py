@@ -113,6 +113,9 @@ class CreateVirtualMachineView(APIView):
                     "id": virtual_machine.id,
                     "name": virtual_machine.name,
                     "status": virtual_machine.status,
+                    "cpu": virtual_machine.cpu,
+                    "ram": virtual_machine.ram,
+                    "cost": virtual_machine.cost,
                     "owner": virtual_machine.owner.username,
                     "created_at": virtual_machine.created_at
                 },
@@ -125,7 +128,7 @@ class CreateVirtualMachineView(APIView):
             "errors": serializer.errors,
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+ 
 
 class UserVirtualMachinesView(APIView):
     permission_classes = [IsAuthenticated]  
