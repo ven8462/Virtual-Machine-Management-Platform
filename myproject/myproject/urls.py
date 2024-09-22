@@ -3,8 +3,8 @@ from rest_framework.routers import DefaultRouter
 from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
 from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscriptionPlanView, MockPaymentView, PaymentHistoryView, CreateSubscriptionPlanView
 from django.http import HttpResponse
-from myapp.views import StandardUserListView, AssignVMMachineView, AllVirtualMachinesView, VirtualMachineEditView
-
+from myapp.views import StandardUserListView, DeleteVMAPIView,  AssignVMMachineView, AllVirtualMachinesView, VirtualMachineEditView
+from myapp.views import CreateSubUserView, ListSubUsersView
 
 def index(request):
     return HttpResponse("Welcome to the VM Management Platform")
@@ -39,4 +39,7 @@ urlpatterns = [
     path('api/delete-subscription-plan/<int:pk>/', DeleteSubscriptionPlanView.as_view(), name='delete_subscription_plan'),
     path('api/assign-vm/', AssignVMMachineView.as_view(), name='assign-vm'),
     path('api/edit-vm/<int:vm_id>/', VirtualMachineEditView.as_view(), name='edit-vm'),
+    path('api/vms/delete/<int:vm_id>/', DeleteVMAPIView.as_view(), name='delete_vm'),
+    path('api/sub-users/create/', CreateSubUserView.as_view(), name='create_sub_user'),
+    path('api/sub-users/', ListSubUsersView.as_view(), name='list_sub_users'),
 ]

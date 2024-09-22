@@ -33,6 +33,14 @@ class CustomUser(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
 
 
+class SubUser(models.Model):
+    parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sub_users')
+    sub_username = models.CharField(max_length=150, unique=True)
+    assigned_model= models.FloatField(default=1.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"SubUser: {self.sub_username} (Parent: {self.parent.username})"
 
 
 
@@ -49,6 +57,7 @@ class VirtualMachine(models.Model):
     ram = models.CharField(max_length=50, default='4 GB') 
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=20.00) 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    unbacked_data = models.FloatField(default=1.0)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -70,6 +79,8 @@ class UserAssignedVM(models.Model):
 class Backup(models.Model):
     vm = models.ForeignKey(VirtualMachine, on_delete=models.CASCADE, related_name='backups')
     size = models.FloatField()  
+    bill = models.FloatField(default=0.0)  
+    status = models.CharField(max_length=20, default='unpaid')  
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

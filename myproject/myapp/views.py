@@ -14,6 +14,9 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from .serializers import AssignVMMachineSerializer
+from .models import SubUser
+from .serializers import SubUserSerializer
+
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -214,6 +217,81 @@ class AssignVMMachineView(APIView):
                 )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class CreateSubUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Get parent user from the token
+        parent_user = request.user
+
+        # Extract data from the request
+        sub_username = request.data.get('sub_username')
+        assigned_model = request.data.get('assigned_model')
+
+        # Check if sub_username already exists
+        if SubUser.objects.filter(sub_username=sub_username).exists():
+            return Response({
+                'message': 'Sub user already exists',
+                "success": False,
+                "statusCode": 400
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the SubUser instance
+        sub_user = SubUser.objects.create(
+            parent=parent_user,
+            sub_username=sub_username,
+            assigned_model=assigned_model
+        )
+
+        # Serialize the sub_user data and return the response
+        serializer = SubUserSerializer(sub_user)
+        return Response({
+            "success": True,
+            "message": "Sub User created successfully",
+            "data": serializer.data,
+            "statusCode": 200
+        }, status=status.HTTP_201_CREATED)
+
+
+class ListSubUsersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the parent user from the token
+        parent_user = request.user
+
+        # Query all sub-users that belong to this parent user
+        sub_users = SubUser.objects.filter(parent=parent_user)
+
+        # Serialize the sub-user data
+        serializer = SubUserSerializer(sub_users, many=True)
+
+        # Return the serialized data
+        return Response({
+            "data":serializer.data,
+            "success": True,
+            "statusCode": 200
+            }, status=status.HTTP_200_OK)
+
+
+
+class DeleteVMAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, vm_id):
+        vm = get_object_or_404(VirtualMachine, id=vm_id)
+
+        if vm.owner != request.user:
+            return Response({"error": "You do not have permission to delete this VM."}, status=status.HTTP_403_FORBIDDEN)
+        
+        vm.delete()
+
+        return Response({"message": "Virtual machine deleted successfully."}, status=status.HTTP_200_OK)
+
+
 
 class VirtualMachineEditView(APIView):
     permission_classes = [IsAuthenticated]

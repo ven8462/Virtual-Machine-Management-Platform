@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import VirtualMachine, UserAssignedVM, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
+from .models import VirtualMachine, SubUser, UserAssignedVM, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
 from django.contrib.auth.models import Group
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.validators import EmailValidator
@@ -104,7 +104,10 @@ class VirtualMachineSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-
+class SubUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubUser
+        fields = ['id', 'sub_username', 'assigned_model', 'created_at']
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
