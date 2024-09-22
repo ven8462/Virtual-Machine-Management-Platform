@@ -215,6 +215,26 @@ class AssignVMMachineView(APIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class VirtualMachineEditView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_vm(self, pk, user):
+        try:
+            return VirtualMachine.objects.get(pk=pk, owner=user)
+        except VirtualMachine.DoesNotExist:
+            return None
+
+    def put(self, request, vm_id):
+        vm = self.get_vm(vm_id, request.user)
+        if not vm:
+            return Response({"error": "Virtual Machine not found or you do not have permission to edit."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = VirtualMachineSerializer(vm, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Virtual Machine updated successfully", "virtual_machine": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class StandardUserListView(generics.ListAPIView):

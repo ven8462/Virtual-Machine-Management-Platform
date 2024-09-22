@@ -87,6 +87,25 @@ class AssignVMMachineSerializer(serializers.Serializer):
         return data
 
 
+from rest_framework import serializers
+from .models import VirtualMachine
+
+class VirtualMachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['name', 'cpu', 'ram', 'cost', 'status'] 
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.cpu = validated_data.get('cpu', instance.cpu)
+        instance.ram = validated_data.get('ram', instance.ram)
+        instance.cost = validated_data.get('cost', instance.cost)
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+        return instance
+
+
+
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -97,7 +116,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class VirtualMachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
-        fields = ['id', 'name', 'status', 'created_at', 'owner'] 
+        fields = ['name', 'cpu', 'ram', 'cost', 'status', 'id',  'created_at', 'owner'] 
 
 
 
