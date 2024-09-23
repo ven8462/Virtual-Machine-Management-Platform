@@ -49,64 +49,22 @@ class SignUpView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        google_token = request.data.get('google_token')
-
-        if google_token:
-            user_info = self.verify_google_token(google_token)
-            if not user_info:
-                return Response({
-                    "success": False,
-                    "message": "Invalid Google token.",
-                    "statusCode": 400
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            # Create or get the user
-            user, created = CustomUser.objects.get_or_create(
-                email=user_info['email'],
-                defaults={
-                    'username': user_info['email'].split('@')[0],  
-                    'first_name': user_info.get('given_name', ''),
-                    'last_name': user_info.get('family_name', ''),
-                }
-            )
-
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                "success": True,
-                "message": "User created successfully" if created else "User already exists",
-                "refresh_token": str(refresh),
-                "access_token": str(refresh.access_token),
-                "statusCode": 201
-            }, status=status.HTTP_201_CREATED)
-
-        # Fallback to regular sign-up
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             user_data = serializer.save()
-            refresh = RefreshToken.for_user(user_data)
             return Response({
                 "success": True,
                 "message": "User created successfully",
-                "refresh_token": str(refresh),
-                "access_token": str(refresh.access_token),
+                "refresh_token": user_data['refresh_token'],
+                "access_token": user_data['access_token'],
                 "statusCode": 201
             }, status=status.HTTP_201_CREATED)
-
         return Response({
             "success": False,
             "message": "Invalid data",
             "errors": serializer.errors,
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
-
-    def verify_google_token(self, token):
-        """ Verify the Google token and get user info """
-        client_id = "132929471498-lcfm9oobe5paa6re1bdvu34ac6m13t6a.apps.googleusercontent.com"
-        response = requests.get(f'https://oauth2.googleapis.com/tokeninfo?id_token={token}')
-
-        if response.status_code == 200:
-            return response.json()  
-        return None
 
 
 
@@ -911,7 +869,7 @@ class CurrentSubscriptionView(generics.RetrieveAPIView):
         }, status=status.HTTP_200_OK)
 
 
-# Make Payment (Mock)
+
 class MockPaymentView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     
@@ -942,7 +900,7 @@ class MockPaymentView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
 
 
-# View Payment History
+
 class PaymentHistoryView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PaymentSerializer
