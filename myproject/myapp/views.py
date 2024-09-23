@@ -115,7 +115,7 @@ class LoginView(APIView):
                 "message": "Login successful.",
                 "refresh_token": str(refresh),
                 "access_token": str(refresh.access_token),
-                "role": user.role.name,  # Return user's role
+                "role": user.role.name if user.role else 'No Role Assigned',  # Return user's role
                 "statusCode": 200
             }, status=status.HTTP_200_OK)
 
