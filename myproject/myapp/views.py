@@ -59,7 +59,7 @@ class SignupView(APIView):
             return Response({
                 "success": True,
                 "message": "User created successfully",
-                "token": access_token,  # Return access token
+                "token": access_token,  
                 "statusCode": 201
             }, status=status.HTTP_201_CREATED)
         return Response({
@@ -76,23 +76,14 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        login_type = request.data.get('login_type', 'manual')  # "manual" or "google"
-        
-        if login_type == 'manual':
-            return self.manual_login(request)
-        elif login_type == 'google':
-            return self.google_login(request)
-        else:
-            return Response({
-                "success": False,
-                "message": "Invalid login type.",
-                "statusCode": 400
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Always perform manual login for this case
+        return self.manual_login(request)
 
     def manual_login(self, request):
         username_or_email = request.data.get('username_or_email')
         password = request.data.get('password')
 
+        # Check if the username_or_email and password are provided
         if not username_or_email or not password:
             return Response({
                 "success": False,
@@ -101,16 +92,19 @@ class LoginView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Check if the user exists by email or username
+            # Determine whether the input is an email or username based on '@' presence
             if '@' in username_or_email:
+                # Input is an email, find user by email
                 user = CustomUser.objects.get(email=username_or_email)
             else:
+                # Input is a username, find user by username
                 user = CustomUser.objects.get(username=username_or_email)
 
+            # Validate password
             if not user.check_password(password):
                 return Response({
                     "success": False,
-                    "message": "Invalid username or password.",
+                    "message": "Invalid username/email or password.",
                     "statusCode": 400
                 }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -126,67 +120,14 @@ class LoginView(APIView):
             }, status=status.HTTP_200_OK)
 
         except CustomUser.DoesNotExist:
+            # User not found
             return Response({
                 "success": False,
-                "message": "Invalid username or password.",
+                "message": "Invalid username/email or password.",
                 "statusCode": 404
             }, status=status.HTTP_404_NOT_FOUND)
 
-    def google_login(self, request):
-        id_token = request.data.get('id_token')
 
-        if not id_token:
-            return Response({
-                "success": False,
-                "message": "Google ID token is required.",
-                "statusCode": 400
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # Verify the token using Google's services
-            request_obj = google.auth.transport.requests.Request()
-            id_info = google.oauth2.id_token.verify_oauth2_token(
-                id_token, request_obj, settings.GOOGLE_CLIENT_ID
-            )
-
-            if 'email' not in id_info:
-                return Response({
-                    "success": False,
-                    "message": "Invalid Google token.",
-                    "statusCode": 400
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            email = id_info['email']
-
-            # Check if the user already exists
-            user, created = CustomUser.objects.get_or_create(email=email, defaults={
-                'username': email.split('@')[0],  # Set username as part of the email before @
-                'password': CustomUser.objects.make_random_password(),  # Create random password
-            })
-
-            if created:
-                # Assign any default role or additional info for newly created users
-                user.save()
-
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                "success": True,
-                "message": "Google login successful.",
-                "refresh_token": str(refresh),
-                "access_token": str(refresh.access_token),
-                "role": user.role.name,
-                "statusCode": 200
-            }, status=status.HTTP_200_OK)
-
-        except ValueError as ve:
-            # Invalid token
-            return Response({
-                "success": False,
-                "message": "Invalid Google ID token.",
-                "error": str(ve),
-                "statusCode": 400
-            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CreateVirtualMachineView(APIView):
