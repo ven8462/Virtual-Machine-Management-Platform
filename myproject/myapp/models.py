@@ -11,7 +11,6 @@ class Role(models.Model):
 
     @staticmethod
     def get_default_role():
-        # You can use get_or_create to avoid duplicates
         role, created = Role.objects.get_or_create(name='Standard User', defaults={'description': 'Default role for new users'})
         return role
     
