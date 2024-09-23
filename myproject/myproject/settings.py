@@ -29,7 +29,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=6),  # Access token valid for 6 hours
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=12),  # Refresh token valid for 12 hours
+    'ROTATE_REFRESH_TOKENS': False,  # Keep this as False unless you want the refresh token to rotate on each access
+    'BLACKLIST_AFTER_ROTATION': True,  # Option to blacklist tokens after they are rotated
+    'ALGORITHM': 'HS256',  # Use default algorithm for signing
+    'SIGNING_KEY': SECRET_KEY,  # Use your project's secret key for signing tokens
+    'AUTH_HEADER_TYPES': ('Bearer',),  # The prefix for your Authorization header
+}
 
 
 # Application definition
@@ -43,7 +56,34 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'myapp',
     'rest_framework',
-    'rest_framework_simplejwt', 
+    'rest_framework_simplejwt',
+    'corsheaders', 
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:3000',
+#     'https://your-frontend-domain.com',
+# ]
+
+
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 REST_FRAMEWORK = {
@@ -69,6 +109,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware', 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 

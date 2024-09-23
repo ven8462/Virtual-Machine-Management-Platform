@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import VirtualMachine, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
+from .models import VirtualMachine, SubUser, UserAssignedVM, Backup, Snapshot, Payment, SubscriptionPlan, UserSubscription, AuditLog, CustomUser, Role
 from django.contrib.auth.models import Group
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.validators import EmailValidator
@@ -44,15 +44,142 @@ class CustomUserSerializer(serializers.ModelSerializer):
             'access_token': str(refresh.access_token)
         }
 
+
+
 class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
-        fields = ['name', 'status']  
+        fields = ['name', 'status', 'cpu', 'ram', 'cost']  
 
     def validate_status(self, value):
         if value not in ['running', 'stopped']:
             raise serializers.ValidationError("Status must be either 'running' or 'stopped'.")
         return value
+
+    # def validate_cost(self, value):
+    #     if value <= 0:
+    #         raise serializers.ValidationError("Cost must be a positive value.")
+    #     return value
+
+    def validate(self, data):
+        return data
+
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    backup_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Payment
+        fields = ['card_number', 'amount', 'backup_id']
+
+    def validate_backup_id(self, value):
+        # Check if the backup exists
+        try:
+            backup = Backup.objects.get(id=value)
+        except Backup.DoesNotExist:
+            raise serializers.ValidationError("Backup with this ID does not exist.")
+        return value
+
+    def create(self, validated_data):
+        # Retrieve backup and mark its status as paid
+        backup = Backup.objects.get(id=validated_data['backup_id'])
+        backup.status = 'paid'
+        backup.save()
+
+        # Remove backup_id from validated_data as it's not part of the Payment model
+        validated_data.pop('backup_id')
+
+        # Create and return the payment
+        return Payment.objects.create(**validated_data)
+
+
+
+class AssignVMMachineSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    vm_id = serializers.IntegerField()
+
+    def validate(self, data):
+        # Check if the user exists
+        try:
+            user = CustomUser.objects.get(pk=data['user_id'])
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("User does not exist.")
+
+        # Check if the VM exists
+        try:
+            vm = VirtualMachine.objects.get(pk=data['vm_id'])
+        except VirtualMachine.DoesNotExist:
+            raise serializers.ValidationError("Virtual Machine does not exist.")
+        
+        # Ensure that the user has fewer than 20 VMs assigned
+        assigned_vm_count = UserAssignedVM.objects.filter(new_owner=user).count()
+        if assigned_vm_count >= 20:
+            raise serializers.ValidationError("This user already has the maximum allowed number of virtual machines assigned.")
+
+        return data
+
+
+class BackupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Backup
+        fields = ['vm', 'size', 'bill']
+    
+    def validate_vm(self, value):
+        """Check if the Virtual Machine exists."""
+        if not VirtualMachine.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Virtual Machine does not exist.")
+        return value
+
+    def validate_size(self, value):
+        """Ensure the size is a positive number."""
+        if value <= 0:
+            raise serializers.ValidationError("Size must be greater than zero.")
+        return value
+
+    def validate_bill(self, value):
+        """Ensure the bill is a non-negative number."""
+        if value < 0:
+            raise serializers.ValidationError("Bill cannot be negative.")
+        return value
+
+
+class VirtualMachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['name', 'cpu', 'ram', 'cost', 'status'] 
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.cpu = validated_data.get('cpu', instance.cpu)
+        instance.ram = validated_data.get('ram', instance.ram)
+        instance.cost = validated_data.get('cost', instance.cost)
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+        return instance
+
+class SubUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubUser
+        fields = ['id', 'sub_username', 'assigned_model', 'created_at']
+
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'role']
+
+
+class VirtualMachineSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['id', 'name', 'cpu', 'ram', 'cost', 'status', 'unbacked_data', 'created_at', 'updated_at']
+
+class VirtualMachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VirtualMachine
+        fields = ['name', 'cpu', 'ram', 'cost', 'status', 'id',  'created_at', 'owner'] 
+
 
 
 class VirtualMachineUpdateSerializer(serializers.ModelSerializer):
@@ -131,12 +258,6 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = ['user', 'amount', 'status', 'transaction_id', 'created_at']
 
-
-
-class VirtualMachineSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = VirtualMachine
-        fields = '__all__'
 
 class BackupSerializer(serializers.ModelSerializer):
     class Meta:
