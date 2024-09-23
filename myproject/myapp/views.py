@@ -29,6 +29,15 @@ from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import os
 from django.core.mail import send_mail
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+from django.core.mail import send_mail
+
+# Load environment variables from .env
+load_dotenv()
 
 
 User = get_user_model()
@@ -303,15 +312,7 @@ class UserVirtualMachinesView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
-import os
-from django.core.mail import send_mail
 
-# Load environment variables from .env
-load_dotenv()
 
 class AssignVMMachineView(APIView):
     def put(self, request, *args, **kwargs):
