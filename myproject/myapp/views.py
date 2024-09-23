@@ -16,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from .serializers import AssignVMMachineSerializer
 from .models import SubUser
 from .serializers import SubUserSerializer, BackupSerializer
-from .serializers import VirtualMachineSerializers
+from .serializers import VirtualMachineSerializers, SignupSerializer
 from .serializers import PaymentSerializer
 from django.contrib.auth import get_user_model
 import jwt
@@ -42,21 +42,24 @@ load_dotenv()
 
 User = get_user_model()
 
-import requests
 
 
-class SignUpView(APIView):
+class SignupView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
-            user_data = serializer.save()
+            user = serializer.save()
+
+            # Generate JWT token
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
             return Response({
                 "success": True,
                 "message": "User created successfully",
-                "refresh_token": user_data['refresh_token'],
-                "access_token": user_data['access_token'],
+                "token": access_token,  # Return access token
                 "statusCode": 201
             }, status=status.HTTP_201_CREATED)
         return Response({
@@ -66,6 +69,7 @@ class SignUpView(APIView):
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    
 
 
 class LoginView(APIView):

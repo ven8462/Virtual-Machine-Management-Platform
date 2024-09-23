@@ -1,11 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, SignUpView, LoginView
+from myapp.views import VirtualMachineViewSet, ViewBillingInfoView, MoveVirtualMachineView, CreateBackupView, DeleteVirtualMachineView, UpdateVirtualMachineView, UserVirtualMachinesView, CreateVirtualMachineView, BackupViewSet, SnapshotViewSet, PaymentViewSet, SubscriptionPlanViewSet, UserSubscriptionViewSet, AuditLogViewSet, LoginView
 from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscriptionPlanView, MockPaymentView, PaymentHistoryView, CreateSubscriptionPlanView
 from django.http import HttpResponse
 from myapp.views import StandardUserListView, DeleteVMAPIView,  AssignVMMachineView, AllVirtualMachinesView, VirtualMachineEditView
 from myapp.views import CreateSubUserView, ListSubUsersView, UnpaidBackupDetailsView, AssignedVirtualMachinesView
-from myapp.views import PaymentView
+from myapp.views import PaymentView, SignupView
 
 
 def index(request):
@@ -24,7 +24,7 @@ urlpatterns = [
     path('', index, name='home'),
     path('api/', include(router.urls)),
     path('api/standard-users/', StandardUserListView.as_view(), name='standard-user-list'),
-    path('api/signup/', SignUpView.as_view(), name='signup'),
+    path('api/signup/', SignupView.as_view(), name='signup'),
     path('api/login/', LoginView.as_view(), name='login'), 
     path('api/create-vms/', CreateVirtualMachineView.as_view(), name='create-vm'),
     path('api/my-vms/', AllVirtualMachinesView.as_view(), name='user-vms'),

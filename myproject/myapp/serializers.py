@@ -5,47 +5,62 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.validators import EmailValidator
 from rest_framework.validators import UniqueValidator
 
+
+
+from rest_framework import serializers
+from django.contrib.auth.hashers import make_password
+from .models import CustomUser, Role
+
+class SignupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'password']
+
+    def validate_password(self, value):
+        # Ensure that the password is hashed before saving
+        return make_password(value)
+
+    def create(self, validated_data):
+        # Get the default role
+        default_role = Role.get_default_role()
+        # Create the user with the default role
+        user = CustomUser.objects.create(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password'],
+            role=default_role
+        )
+        return user
+
+
 class CustomUserSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(
-        validators=[
-            EmailValidator(message="Enter a valid email address."),
-            UniqueValidator(queryset=CustomUser.objects.all(), message="Email is already taken.")
-        ]
-    )
-    username = serializers.CharField(
-        validators=[UniqueValidator(queryset=CustomUser.objects.all(), message="Username is already taken.")]
-    )
+    email = serializers.EmailField(validators=[EmailValidator(message="Enter a valid email address.")])
     password = serializers.CharField(write_only=True)
-    role = serializers.CharField(source='role.name', read_only=True)  # Include role in the response
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'role']  # Add role to fields
+        fields = ['username', 'email', 'password', 'first_name', 'last_name']
 
     def create(self, validated_data):
-        # Set the default role if no role is provided
-        default_role = Role.get_default_role()
-
         user = CustomUser(
             username=validated_data['username'],
             email=validated_data['email'],
             first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            role=default_role  # Assign the default role
+            last_name=validated_data.get('last_name', '')
         )
-        user.set_password(validated_data['password']) 
+        user.set_password(validated_data['password'])  # Hash the password
         user.save()
 
-        # Generate both refresh and access tokens
+        # Generate JWT token
         refresh = RefreshToken.for_user(user)
         return {
             'user': user,
-            'refresh_token': str(refresh),
-            'access_token': str(refresh.access_token)
+            'token': str(refresh.access_token)  # Return access token only
         }
+    
 
 
-
+    
 class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
