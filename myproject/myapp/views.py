@@ -825,20 +825,7 @@ class SubscribePlanView(generics.GenericAPIView):
         plan_name = request.data.get('plan')
         plan = get_object_or_404(SubscriptionPlan, name=plan_name)
 
-        # Check if user already has an active subscription
-        existing_subscription = UserSubscription.objects.filter(
-            user=request.user,
-            expires_at__gt=timezone.now()
-        ).first()
-
-        if existing_subscription:
-            return Response({
-                "success": False,
-                "message": "User already has an active subscription.",
-                "statusCode": 400
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Create new subscription
+        # Create a new subscription without checking for existing subscriptions
         subscription = UserSubscription.objects.create(
             user=request.user,
             subscription_plan=plan,
