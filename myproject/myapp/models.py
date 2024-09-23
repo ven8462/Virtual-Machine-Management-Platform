@@ -33,6 +33,16 @@ class CustomUser(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
 
 
+class SubUser(models.Model):
+    parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sub_users')
+    sub_username = models.CharField(max_length=150, unique=True)
+    assigned_model= models.FloatField(default=1.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"SubUser: {self.sub_username} (Parent: {self.parent.username})"
+
+
 
     
 class VirtualMachine(models.Model):
@@ -43,16 +53,34 @@ class VirtualMachine(models.Model):
     
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    cpu = models.CharField(max_length=50, default='2 vCPUs')  
+    ram = models.CharField(max_length=50, default='4 GB') 
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=20.00) 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    unbacked_data = models.FloatField(default=1.0)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
 
+
+class UserAssignedVM(models.Model):
+    new_owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    vm = models.ForeignKey(VirtualMachine, on_delete=models.CASCADE)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('new_owner', 'vm')
+    def __str__(self):
+        return f"{self.new_owner.username} assigned to {self.vm.name}"
+
+
 class Backup(models.Model):
     vm = models.ForeignKey(VirtualMachine, on_delete=models.CASCADE, related_name='backups')
     size = models.FloatField()  
+    bill = models.FloatField(default=0.0)  
+    status = models.CharField(max_length=20, default='unpaid')  
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -85,14 +113,13 @@ class SubscriptionPlan(models.Model):
 
 class Payment(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.CASCADE, null=True, blank=True)
+    card_number = models.CharField(max_length=16, default=4567)  
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=[('paid', 'Paid'), ('unpaid', 'Unpaid')])
-    transaction_id = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Payment - {self.transaction_id} - {self.status}"
+        return f"Payment by {self.user.username} - {self.amount}"
+
 
 class UserSubscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
