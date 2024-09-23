@@ -5,7 +5,7 @@ from myapp.views import SubscribePlanView, CurrentSubscriptionView, DeleteSubscr
 from django.http import HttpResponse
 from myapp.views import StandardUserListView, DeleteVMAPIView,  AssignVMMachineView, AllVirtualMachinesView, VirtualMachineEditView
 from myapp.views import CreateSubUserView, ListSubUsersView, UnpaidBackupDetailsView, AssignedVirtualMachinesView
-
+from myapp.views import PaymentView
 
 
 def index(request):
@@ -46,4 +46,5 @@ urlpatterns = [
     path('api/sub-users/', ListSubUsersView.as_view(), name='list_sub_users'),
     path('api/vms/assigned/', AssignedVirtualMachinesView.as_view(), name='assigned_virtual_machines'),
     path('api/unpaid-backups/', UnpaidBackupDetailsView.as_view(), name='unpaid-backups'),
+    path('api/make-payment/', PaymentView.as_view(), name='make_payment'),
 ]

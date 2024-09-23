@@ -44,6 +44,8 @@ class CustomUserSerializer(serializers.ModelSerializer):
             'access_token': str(refresh.access_token)
         }
 
+
+
 class VirtualMachineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = VirtualMachine
@@ -61,6 +63,37 @@ class VirtualMachineCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         return data
+
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    backup_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Payment
+        fields = ['card_number', 'amount', 'backup_id']
+
+    def validate_backup_id(self, value):
+        # Check if the backup exists
+        try:
+            backup = Backup.objects.get(id=value)
+        except Backup.DoesNotExist:
+            raise serializers.ValidationError("Backup with this ID does not exist.")
+        return value
+
+    def create(self, validated_data):
+        # Retrieve backup and mark its status as paid
+        backup = Backup.objects.get(id=validated_data['backup_id'])
+        backup.status = 'paid'
+        backup.save()
+
+        # Remove backup_id from validated_data as it's not part of the Payment model
+        validated_data.pop('backup_id')
+
+        # Create and return the payment
+        return Payment.objects.create(**validated_data)
+
+
 
 class AssignVMMachineSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()

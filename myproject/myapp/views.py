@@ -17,25 +17,72 @@ from .serializers import AssignVMMachineSerializer
 from .models import SubUser
 from .serializers import SubUserSerializer, BackupSerializer
 from .serializers import VirtualMachineSerializers
+from .serializers import PaymentSerializer
 from django.contrib.auth import get_user_model
 import jwt
+import google.auth.transport.requests
+import google.oauth2.id_token
+from django.conf import settings
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+from django.core.mail import send_mail
+
 
 User = get_user_model()
+
+import requests
+
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        google_token = request.data.get('google_token')
+
+        if google_token:
+            user_info = self.verify_google_token(google_token)
+            if not user_info:
+                return Response({
+                    "success": False,
+                    "message": "Invalid Google token.",
+                    "statusCode": 400
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create or get the user
+            user, created = CustomUser.objects.get_or_create(
+                email=user_info['email'],
+                defaults={
+                    'username': user_info['email'].split('@')[0],  
+                    'first_name': user_info.get('given_name', ''),
+                    'last_name': user_info.get('family_name', ''),
+                }
+            )
+
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "success": True,
+                "message": "User created successfully" if created else "User already exists",
+                "refresh_token": str(refresh),
+                "access_token": str(refresh.access_token),
+                "statusCode": 201
+            }, status=status.HTTP_201_CREATED)
+
+        # Fallback to regular sign-up
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             user_data = serializer.save()
+            refresh = RefreshToken.for_user(user_data)
             return Response({
                 "success": True,
                 "message": "User created successfully",
-                "refresh_token": user_data['refresh_token'],
-                "access_token": user_data['access_token'],
+                "refresh_token": str(refresh),
+                "access_token": str(refresh.access_token),
                 "statusCode": 201
             }, status=status.HTTP_201_CREATED)
+
         return Response({
             "success": False,
             "message": "Invalid data",
@@ -43,16 +90,38 @@ class SignUpView(APIView):
             "statusCode": 400
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    def verify_google_token(self, token):
+        """ Verify the Google token and get user info """
+        client_id = "132929471498-lcfm9oobe5paa6re1bdvu34ac6m13t6a.apps.googleusercontent.com"
+        response = requests.get(f'https://oauth2.googleapis.com/tokeninfo?id_token={token}')
+
+        if response.status_code == 200:
+            return response.json()  
+        return None
+
+
 
 class LoginView(APIView):
-    permission_classes = [AllowAny]  # Allow anyone to access this endpoint
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        # Get username or email and password from request data
+        login_type = request.data.get('login_type', 'manual')  # "manual" or "google"
+        
+        if login_type == 'manual':
+            return self.manual_login(request)
+        elif login_type == 'google':
+            return self.google_login(request)
+        else:
+            return Response({
+                "success": False,
+                "message": "Invalid login type.",
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    def manual_login(self, request):
         username_or_email = request.data.get('username_or_email')
         password = request.data.get('password')
 
-        # Check if the username_or_email and password are provided
         if not username_or_email or not password:
             return Response({
                 "success": False,
@@ -60,15 +129,13 @@ class LoginView(APIView):
                 "statusCode": 400
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Attempt to find the user by username or email
         try:
-            # If username_or_email contains '@', assume it's an email
+            # Check if the user exists by email or username
             if '@' in username_or_email:
                 user = CustomUser.objects.get(email=username_or_email)
             else:
                 user = CustomUser.objects.get(username=username_or_email)
 
-            # Validate password
             if not user.check_password(password):
                 return Response({
                     "success": False,
@@ -76,10 +143,8 @@ class LoginView(APIView):
                     "statusCode": 400
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # If the user is successfully authenticated, generate tokens
+            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
-            
-            # Add user's role to the response
             return Response({
                 "success": True,
                 "message": "Login successful.",
@@ -95,6 +160,62 @@ class LoginView(APIView):
                 "message": "Invalid username or password.",
                 "statusCode": 404
             }, status=status.HTTP_404_NOT_FOUND)
+
+    def google_login(self, request):
+        id_token = request.data.get('id_token')
+
+        if not id_token:
+            return Response({
+                "success": False,
+                "message": "Google ID token is required.",
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Verify the token using Google's services
+            request_obj = google.auth.transport.requests.Request()
+            id_info = google.oauth2.id_token.verify_oauth2_token(
+                id_token, request_obj, settings.GOOGLE_CLIENT_ID
+            )
+
+            if 'email' not in id_info:
+                return Response({
+                    "success": False,
+                    "message": "Invalid Google token.",
+                    "statusCode": 400
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            email = id_info['email']
+
+            # Check if the user already exists
+            user, created = CustomUser.objects.get_or_create(email=email, defaults={
+                'username': email.split('@')[0],  # Set username as part of the email before @
+                'password': CustomUser.objects.make_random_password(),  # Create random password
+            })
+
+            if created:
+                # Assign any default role or additional info for newly created users
+                user.save()
+
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "success": True,
+                "message": "Google login successful.",
+                "refresh_token": str(refresh),
+                "access_token": str(refresh.access_token),
+                "role": user.role.name,
+                "statusCode": 200
+            }, status=status.HTTP_200_OK)
+
+        except ValueError as ve:
+            # Invalid token
+            return Response({
+                "success": False,
+                "message": "Invalid Google ID token.",
+                "error": str(ve),
+                "statusCode": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CreateVirtualMachineView(APIView):
@@ -182,10 +303,20 @@ class UserVirtualMachinesView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+from django.core.mail import send_mail
+
+# Load environment variables from .env
+load_dotenv()
+
 class AssignVMMachineView(APIView):
     def put(self, request, *args, **kwargs):
         serializer = AssignVMMachineSerializer(data=request.data)
-        
+
         if serializer.is_valid():
             user_id = serializer.validated_data['user_id']
             vm_id = serializer.validated_data['vm_id']
@@ -194,13 +325,21 @@ class AssignVMMachineView(APIView):
                 # Fetch the user and the VM
                 user = CustomUser.objects.get(pk=user_id)
                 vm = VirtualMachine.objects.get(pk=vm_id)
-                
-                # Assign the VM to the user and save the assignment in UserAssignedVM
+
+                # Assign the VM to the user and save the assignment
                 vm.owner = user
                 vm.save()
 
                 # Save the assignment in UserAssignedVM
                 UserAssignedVM.objects.create(new_owner=user, vm=vm)
+
+                # Get recipient's email (user's email)
+                recipient_email = user.email
+                vm_name = vm.name
+                user_name = user.username
+
+                # Send email notification
+                self.send_assignment_email(recipient_email, user_name, vm_name)
 
                 return Response(
                     {
@@ -216,14 +355,65 @@ class AssignVMMachineView(APIView):
                         "message": "Invalid user or virtual machine ID.",
                         "success": False,
                         "statusCode": 500
-                     },
+                    },
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def send_assignment_email(self, recipient_email, username, vm_name):
+        try:
+            # SMTP configuration loaded from environment variables
+            smtp_host = os.getenv('SMTP_HOST')
+            smtp_port = os.getenv('SMTP_PORT')
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+
+            # Email content
+            subject = "VM Assignment Notification"
+            body = f"Hello {username},\n\nYou have been assigned the virtual machine '{vm_name}'.\n\nBest regards,\nVM Management Team"
+
+            # Prepare the email
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user
+            msg['To'] = recipient_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+
+            # Establish connection to the SMTP server
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()  # Upgrade the connection to secure
+            server.login(smtp_user, smtp_password)
+
+            # Send email
+            server.sendmail(smtp_user, recipient_email, msg.as_string())
+
+            # Close the SMTP connection
+            server.quit()
+
+            print(f"Email sent successfully to {recipient_email}")
+
+        except Exception as e:
+            print(f"Failed to send email. Error: {e}")
 
 
+
+class PaymentView(APIView):
+    permission_classes = [IsAuthenticated]  # Requires authentication
+
+    def post(self, request):
+        # Get the authenticated user from the access token
+        user = request.user
+
+        # Attach the user to the data and pass it to the serializer
+        data = request.data.copy()
+        data['user'] = user.id
+
+        serializer = PaymentSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()  # Save payment and update the backup status
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -246,9 +436,7 @@ class UnpaidBackupDetailsView(APIView):
         if not unpaid_backups.exists():
             return Response({"message": "No unpaid backups found."}, status=status.HTTP_404_NOT_FOUND)
         
-        total_bill = sum(backup.bill for backup in unpaid_backups)
-        
-        # Prepare the response data
+        # Prepare the response data with only backup details
         backup_details = [
             {
                 "vm_name": backup.vm.name,
@@ -260,12 +448,11 @@ class UnpaidBackupDetailsView(APIView):
             for backup in unpaid_backups
         ]
 
-        response_data = {
-            "total_bill": total_bill,
-            "backups": backup_details,
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response({
+            "data": backup_details,
+            "success": True,
+            "statusCode": 200
+            }, status=status.HTTP_200_OK)
 
 
 
