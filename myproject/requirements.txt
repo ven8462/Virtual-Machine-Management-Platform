@@ -1,3 +1,4 @@
+
 alabaster @ file:///home/ktietz/src/ci/alabaster_1611921544520/work
 anaconda-client @ file:///tmp/build/80754af9/anaconda-client_1635342557008/work
 anaconda-navigator==2.1.1
@@ -283,3 +284,19 @@ zict==2.0.0
 zipp @ file:///tmp/build/80754af9/zipp_1633618647012/work
 zope.event==4.5.0
 zope.interface @ file:///tmp/build/80754af9/zope.interface_1625036153595/work
+asgiref==3.8.1
+cachetools==5.5.0
+Django==5.1.1
+django-cors-headers==4.4.0
+django-environ==0.11.2
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+google-auth==2.35.0
+psycopg2==2.9.9
+pyasn1==0.6.1
+pyasn1_modules==0.4.1
+PyJWT==2.9.0
+python-dotenv==1.0.1
+rsa==4.9
+sqlparse==0.5.1
+typing_extensions==4.12.2
